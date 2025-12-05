@@ -4,6 +4,9 @@ import 'package:habit_tracker_mvp/providers/app_state.dart';
 import 'package:habit_tracker_mvp/theme/app_theme.dart';
 import 'package:habit_tracker_mvp/screens/add_task_sheet.dart';
 import 'package:habit_tracker_mvp/screens/manage_tasks_screen.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:habit_tracker_mvp/providers/calendar_provider.dart';
+import 'package:habit_tracker_mvp/widgets/calendar_event_tile.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
@@ -20,6 +23,7 @@ class _TaskMatrixScreenState extends State<TaskMatrixScreen> {
   @override
   Widget build(BuildContext context) {
     final appState = Provider.of<AppState>(context);
+    final calendarProvider = Provider.of<CalendarProvider>(context);
     final allTasks = appState.tasks;
     
     // Filter tasks based on completion status if needed
@@ -114,6 +118,112 @@ class _TaskMatrixScreenState extends State<TaskMatrixScreen> {
               ],
             ),
           ),
+          // --- Calendar Integration Section ---
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (!calendarProvider.isConnected)
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => calendarProvider.connectAndFetch(),
+                      icon: const Icon(Icons.calendar_month),
+                      label: const Text('Integrate Google Calendar'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.all(12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                
+                if (calendarProvider.isLoading)
+                  const Center(child: Padding(
+                    padding: EdgeInsets.all(8.0),
+                    child: CircularProgressIndicator(),
+                  )),
+
+                if (calendarProvider.error != null)
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Text(
+                      calendarProvider.error!,
+                      style: const TextStyle(color: Colors.red, fontSize: 12),
+                    ),
+                  ),
+
+                if (calendarProvider.isConnected && !calendarProvider.isLoading) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Text(
+                        "Today's Agenda (",
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      RichText(
+                        text: TextSpan(
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Product Sans', // Optional: if available, otherwise default
+                          ),
+                          children: const [
+                            TextSpan(text: 'G', style: TextStyle(color: Color(0xFF4285F4))),
+                            TextSpan(text: 'o', style: TextStyle(color: Color(0xFFDB4437))),
+                            TextSpan(text: 'o', style: TextStyle(color: Color(0xFFF4B400))),
+                            TextSpan(text: 'g', style: TextStyle(color: Color(0xFF4285F4))),
+                            TextSpan(text: 'l', style: TextStyle(color: Color(0xFF0F9D58))),
+                            TextSpan(text: 'e', style: TextStyle(color: Color(0xFFDB4437))),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        " Calendar)",
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  if (calendarProvider.events.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.event_busy, size: 16, color: Colors.grey),
+                          SizedBox(width: 8),
+                          Text("No tasks scheduled in Google Calendar today."),
+                        ],
+                      ),
+                    )
+                  else
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 200),
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: calendarProvider.events.length,
+                        itemBuilder: (context, index) {
+                          return CalendarEventTile(event: calendarProvider.events[index]);
+                        },
+                      ),
+                    ),
+                  const Divider(height: 32),
+                ],
+              ],
+            ),
+          ),
+          // --- End Calendar Section ---
           const SizedBox(height: 80), // Space for bottom nav
         ],
       ),

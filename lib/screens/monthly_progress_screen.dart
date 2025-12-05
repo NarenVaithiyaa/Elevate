@@ -3,67 +3,52 @@ import 'package:habit_tracker_mvp/providers/app_state.dart';
 import 'package:habit_tracker_mvp/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 
-class MonthlyProgressScreen extends StatelessWidget {
+class MonthlyProgressScreen extends StatefulWidget {
   const MonthlyProgressScreen({super.key});
 
-  void _showDetailedProgress(BuildContext context) {
-    final appState = Provider.of<AppState>(context, listen: false);
-    final habits = appState.habits;
-    final now = DateTime.now();
+  @override
+  State<MonthlyProgressScreen> createState() => _MonthlyProgressScreenState();
+}
 
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Detailed Progress - ${now.month}/${now.year}',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 16),
-            if (habits.isEmpty)
-              const Text('No habits to show.')
-            else
-              Expanded(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: habits.length,
-                  itemBuilder: (context, index) {
-                    final habit = habits[index];
-                    // Calculate completions for current month
-                    final completions = habit.completedDates.where((date) => 
-                      date.year == now.year && date.month == now.month
-                    ).length;
-                    
-                    return ListTile(
-                      leading: Icon(habit.icon, color: habit.color),
-                      title: Text(habit.title),
-                      trailing: Text(
-                        '$completions days',
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.accentPrimary,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
+class _MonthlyProgressScreenState extends State<MonthlyProgressScreen> {
+  DateTime _focusedDate = DateTime.now();
+
+  void _changeMonth(int offset) {
+    setState(() {
+      _focusedDate = DateTime(_focusedDate.year, _focusedDate.month + offset);
+    });
+  }
+
+  int _getDaysInMonth(DateTime date) {
+    return DateTime(date.year, date.month + 1, 0).day;
+  }
+
+  int _getFirstWeekday(DateTime date) {
+    return DateTime(date.year, date.month, 1).weekday;
   }
 
   @override
   Widget build(BuildContext context) {
+    final appState = Provider.of<AppState>(context);
+    final habits = appState.habits;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Calculate completion data for the focused month
+    final Map<int, int> dailyCompletions = {};
+    for (var habit in habits) {
+      for (var date in habit.completedDates) {
+        if (date.year == _focusedDate.year && date.month == _focusedDate.month) {
+          dailyCompletions[date.day] = (dailyCompletions[date.day] ?? 0) + 1;
+        }
+      }
+    }
+
+    final daysInMonth = _getDaysInMonth(_focusedDate);
+    final firstWeekday = _getFirstWeekday(_focusedDate); // 1 = Mon, 7 = Sun
+    // Adjust for 0-based index if needed, but GridView usually works well with 1-based logic if we pad.
+    // Let's assume Monday start.
+    final paddingDays = firstWeekday - 1; 
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Monthly Progress'),
@@ -73,15 +58,15 @@ class MonthlyProgressScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Stats Cards
+            // Stats Cards (Placeholder for now, or we can calculate)
             Row(
               children: [
                 Expanded(
                   child: _buildStatCard(
                     context,
-                    'Current Streak',
-                    '5 days',
-                    Icons.local_fire_department,
+                    'Total Habits',
+                    '${habits.length}',
+                    Icons.list,
                     Colors.orange,
                   ),
                 ),
@@ -89,9 +74,9 @@ class MonthlyProgressScreen extends StatelessWidget {
                 Expanded(
                   child: _buildStatCard(
                     context,
-                    'Completion Rate',
-                    '72%',
-                    Icons.pie_chart,
+                    'This Month',
+                    '${dailyCompletions.values.fold(0, (a, b) => a + b)} done',
+                    Icons.check_circle,
                     Colors.blue,
                   ),
                 ),
@@ -99,7 +84,7 @@ class MonthlyProgressScreen extends StatelessWidget {
             ),
             const SizedBox(height: 32),
 
-            // Heatmap Calendar Placeholder
+            // Heatmap Calendar
             Text(
               'Consistency Map',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -110,7 +95,7 @@ class MonthlyProgressScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Theme.of(context).cardTheme.color ?? Colors.white,
+                color: Theme.of(context).cardTheme.color ?? (isDark ? const Color(0xFF1E1E1E) : Colors.white),
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
@@ -125,19 +110,41 @@ class MonthlyProgressScreen extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
+                      IconButton(
+                        icon: const Icon(Icons.chevron_left),
+                        onPressed: () => _changeMonth(-1),
+                      ),
                       Text(
-                        'May 2024',
+                        '${_monthName(_focusedDate.month)} ${_focusedDate.year}',
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       IconButton(
                         icon: const Icon(Icons.chevron_right),
-                        onPressed: () => _showDetailedProgress(context),
+                        onPressed: () => _changeMonth(1),
                       ),
                     ],
                   ),
                   const SizedBox(height: 16),
+                  // Weekday headers
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+                        .map((day) => SizedBox(
+                              width: 32,
+                              child: Text(
+                                day,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark ? Colors.grey[400] : Colors.grey[600],
+                                ),
+                              ),
+                            ))
+                        .toList(),
+                  ),
+                  const SizedBox(height: 8),
                   GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
@@ -146,14 +153,40 @@ class MonthlyProgressScreen extends StatelessWidget {
                       crossAxisSpacing: 8,
                       mainAxisSpacing: 8,
                     ),
-                    itemCount: 31,
+                    itemCount: daysInMonth + paddingDays,
                     itemBuilder: (context, index) {
-                      // Dummy intensity logic
-                      final intensity = (index % 4) * 0.25; 
+                      if (index < paddingDays) {
+                        return const SizedBox();
+                      }
+                      
+                      final day = index - paddingDays + 1;
+                      final count = dailyCompletions[day] ?? 0;
+                      final totalHabits = habits.length;
+                      final intensity = totalHabits == 0 ? 0.0 : (count / totalHabits).clamp(0.0, 1.0);
+                      
+                      // Color logic
+                      Color cellColor;
+                      if (count == 0) {
+                        cellColor = isDark ? Colors.grey[800]! : Colors.grey[200]!;
+                      } else {
+                        cellColor = AppColors.accentPrimary.withOpacity(0.2 + (0.8 * intensity));
+                      }
+
                       return Container(
                         decoration: BoxDecoration(
-                          color: AppColors.accentPrimary.withOpacity(intensity == 0 ? 0.1 : intensity),
+                          color: cellColor,
                           borderRadius: BorderRadius.circular(8),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          '$day',
+                          style: TextStyle(
+                            color: count > 0 
+                                ? (intensity > 0.5 ? Colors.white : AppColors.accentPrimary)
+                                : (isDark ? Colors.grey[600] : Colors.grey[400]),
+                            fontWeight: count > 0 ? FontWeight.bold : FontWeight.normal,
+                            fontSize: 12,
+                          ),
                         ),
                       );
                     },
@@ -165,6 +198,14 @@ class MonthlyProgressScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _monthName(int month) {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    return months[month - 1];
   }
 
 

@@ -52,6 +52,5 @@ class DefaultFirebaseOptions {
     appId: '1:685728481364:android:39b129c026dd7f958eedc1',
     messagingSenderId: '685728481364',
     projectId: 'habit-tracker-mvp-7cc72',
-    storageBucket: 'habit-tracker-mvp-7cc72.firebasestorage.appspot.com',
   );
 }

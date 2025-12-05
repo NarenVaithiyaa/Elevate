@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:habit_tracker_mvp/firebase_options.dart';
 import 'package:habit_tracker_mvp/providers/app_state.dart';
 import 'package:habit_tracker_mvp/providers/auth_provider.dart';
+import 'package:habit_tracker_mvp/providers/calendar_provider.dart';
 import 'package:habit_tracker_mvp/theme/app_theme.dart';
 import 'package:habit_tracker_mvp/widgets/auth_gate.dart';
 import 'package:provider/provider.dart';
@@ -45,6 +46,7 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AppState()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => CalendarProvider()),
       ],
       child: Consumer<AppState>(
         builder: (context, appState, child) {

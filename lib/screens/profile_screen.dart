@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:habit_tracker_mvp/providers/auth_provider.dart';
 import 'package:habit_tracker_mvp/providers/app_state.dart';
 import 'package:habit_tracker_mvp/theme/app_theme.dart';
-import 'package:habit_tracker_mvp/screens/welcome_screen.dart';
 import 'package:provider/provider.dart';
 
 class ProfileScreen extends StatefulWidget {

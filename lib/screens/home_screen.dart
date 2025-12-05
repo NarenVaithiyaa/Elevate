@@ -11,6 +11,7 @@ import 'package:habit_tracker_mvp/theme/app_theme.dart';
 import 'package:habit_tracker_mvp/widgets/bottom_nav_bar.dart';
 import 'package:habit_tracker_mvp/widgets/habit_card.dart';
 import 'package:provider/provider.dart';
+import 'package:habit_tracker_mvp/services/weather_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -32,6 +33,16 @@ class _HomeScreenState extends State<HomeScreen> {
       const MonthlyProgressScreen(),
       const ProfileScreen(),
     ];
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Listen to AuthProvider so we get notified when user is set
+    final user = Provider.of<AuthProvider>(context).user;
+    if (user != null) {
+      Provider.of<AppState>(context, listen: false).initialize(user.uid);
+    }
   }
 
   void _onTabTapped(int index) {
@@ -104,10 +115,78 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class DashboardView extends StatelessWidget {
+class DashboardView extends StatefulWidget {
   final VoidCallback onCalendarTap;
 
   const DashboardView({super.key, required this.onCalendarTap});
+
+  @override
+  State<DashboardView> createState() => _DashboardViewState();
+}
+
+class _DashboardViewState extends State<DashboardView> {
+  final WeatherService _weatherService = WeatherService();
+  String _greeting = 'Good morning,';
+  String _weatherCondition = 'Loading...';
+  String _weatherSuggestion = 'Fetching weather...';
+  IconData _weatherIcon = Icons.cloud;
+
+  @override
+  void initState() {
+    super.initState();
+    _updateGreeting();
+    _fetchWeather();
+  }
+
+  void _updateGreeting() {
+    setState(() {
+      _greeting = _weatherService.getGreeting();
+    });
+  }
+
+  Future<void> _fetchWeather() async {
+    try {
+      final weatherData = await _weatherService.getWeather();
+      if (weatherData.isNotEmpty) {
+        final main = weatherData['weather'][0]['main'];
+        final temp = weatherData['main']['temp'];
+        
+        if (mounted) {
+          setState(() {
+            _weatherCondition = "It's $main!";
+            _weatherSuggestion = _weatherService.getWeatherSuggestion(main, temp.toDouble());
+            _weatherIcon = _getWeatherIcon(main);
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _weatherCondition = "Weather unavailable";
+            _weatherSuggestion = "Could not fetch local weather.";
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _weatherCondition = "Weather unavailable";
+          _weatherSuggestion = "Please check location permissions.";
+        });
+      }
+    }
+  }
+
+  IconData _getWeatherIcon(String main) {
+    switch (main.toLowerCase()) {
+      case 'thunderstorm': return Icons.flash_on;
+      case 'drizzle':
+      case 'rain': return Icons.grain;
+      case 'snow': return Icons.ac_unit;
+      case 'clear': return Icons.wb_sunny;
+      case 'clouds': return Icons.cloud;
+      default: return Icons.wb_cloudy;
+    }
+  }
 
   void _showNotifications(BuildContext context) {
     showModalBottomSheet(
@@ -180,7 +259,7 @@ class DashboardView extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Good morning,',
+                      _greeting,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         color: isDark ? Colors.grey[400] : AppColors.textSecondary,
                       ),
@@ -197,7 +276,7 @@ class DashboardView extends StatelessWidget {
                   children: [
                     IconButton(
                       icon: const Icon(Icons.calendar_today_outlined),
-                      onPressed: onCalendarTap,
+                      onPressed: widget.onCalendarTap,
                     ),
                     Stack(
                       children: [
@@ -254,7 +333,7 @@ class DashboardView extends StatelessWidget {
                       color: isDark ? Colors.white.withOpacity(0.1) : Colors.white,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.cloud, color: AppColors.accentPrimary),
+                    child: Icon(_weatherIcon, color: AppColors.accentPrimary),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -262,14 +341,14 @@ class DashboardView extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          "It's cloudy!",
+                          _weatherCondition,
                           style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                             color: isDark ? Colors.white : Colors.black,
                           ),
                         ),
                         Text(
-                          "Perfect for a cozy reading session.",
+                          _weatherSuggestion,
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: isDark ? Colors.grey[300] : AppColors.textSecondary,
                           ),

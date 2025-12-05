@@ -1,96 +1,54 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:habit_tracker_mvp/models/habit.dart';
 import 'package:habit_tracker_mvp/models/task.dart';
-import 'package:habit_tracker_mvp/theme/app_theme.dart';
-import 'package:uuid/uuid.dart';
+import 'package:habit_tracker_mvp/services/firestore_service.dart';
 
 class AppState extends ChangeNotifier {
   bool _isDarkMode = false;
   bool get isDarkMode => _isDarkMode;
+  
+  FirestoreService? _firestoreService;
+  StreamSubscription<List<Habit>>? _habitsSubscription;
+  StreamSubscription<List<Task>>? _tasksSubscription;
 
   void toggleTheme() {
     _isDarkMode = !_isDarkMode;
     notifyListeners();
   }
 
-  final List<Habit> _habits = [
-    Habit(
-      id: '1',
-      title: 'Reading',
-      description: 'Read 20 pages',
-      color: AppColors.cardYellow,
-      icon: Icons.book,
-      completedDates: [],
-    ),
-    Habit(
-      id: '2',
-      title: 'Household',
-      description: 'Make bed in the morning',
-      color: AppColors.cardGreen,
-      icon: Icons.home,
-      completedDates: [DateTime.now()],
-    ),
-    Habit(
-      id: '3',
-      title: 'Programming',
-      description: 'Write mini-games',
-      color: AppColors.cardGray,
-      icon: Icons.computer,
-      completedDates: [],
-    ),
-    Habit(
-      id: '4',
-      title: 'Positive thinking',
-      description: 'Write affirmations',
-      color: AppColors.cardBlue,
-      icon: Icons.psychology,
-      completedDates: [],
-    ),
-    Habit(
-      id: '5',
-      title: 'Financial literacy',
-      description: 'Record expenses',
-      color: AppColors.cardPink,
-      icon: Icons.account_balance_wallet,
-      completedDates: [DateTime.now()],
-    ),
-  ];
-
-  final List<Task> _tasks = [
-    Task(
-      id: '1',
-      title: 'Submit Project Report',
-      dueDate: DateTime.now().add(const Duration(days: 1)),
-      isImportant: true,
-      isUrgent: true,
-    ),
-    Task(
-      id: '2',
-      title: 'Plan Q3 Strategy',
-      dueDate: DateTime.now().add(const Duration(days: 3)),
-      isImportant: true,
-      isUrgent: false,
-    ),
-    Task(
-      id: '3',
-      title: 'Reply to emails',
-      dueDate: DateTime.now(),
-      isImportant: false,
-      isUrgent: true,
-    ),
-    Task(
-      id: '4',
-      title: 'Organize desktop',
-      dueDate: DateTime.now().add(const Duration(days: 5)),
-      isImportant: false,
-      isUrgent: false,
-    ),
-  ];
+  List<Habit> _habits = [];
+  List<Task> _tasks = [];
 
   List<Habit> get habits => _habits;
   List<Task> get tasks => _tasks;
 
-  void toggleHabitCompletion(String id) {
+  void initialize(String userId) {
+    _firestoreService = FirestoreService(uid: userId);
+    
+    _habitsSubscription?.cancel();
+    _habitsSubscription = _firestoreService!.getHabitsStream().listen((habits) {
+      _habits = habits;
+      notifyListeners();
+    });
+
+    _tasksSubscription?.cancel();
+    _tasksSubscription = _firestoreService!.getTasksStream().listen((tasks) {
+      _tasks = tasks;
+      notifyListeners();
+    });
+  }
+
+  @override
+  void dispose() {
+    _habitsSubscription?.cancel();
+    _tasksSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> toggleHabitCompletion(String id) async {
+    if (_firestoreService == null) return;
+    
     final index = _habits.indexWhere((h) => h.id == id);
     if (index != -1) {
       final habit = _habits[index];
@@ -99,101 +57,115 @@ class AppState extends ChangeNotifier {
       
       List<DateTime> newDates = List.from(habit.completedDates);
       
-      if (habit.isCompletedToday()) {
-        newDates.removeWhere((date) => 
-          date.year == today.year && 
-          date.month == today.month && 
-          date.day == today.day);
+      // Check if already completed today
+      final todayIndex = newDates.indexWhere((date) => 
+        date.year == today.year && 
+        date.month == today.month && 
+        date.day == today.day
+      );
+
+      if (todayIndex != -1) {
+        newDates.removeAt(todayIndex);
       } else {
-        newDates.add(today);
+        newDates.add(now);
       }
 
-      _habits[index] = Habit(
-        id: habit.id,
-        title: habit.title,
-        description: habit.description,
-        color: habit.color,
-        icon: habit.icon,
-        frequency: habit.frequency,
-        completedDates: newDates,
-      );
-      notifyListeners();
+      await _firestoreService!.updateHabit(habit.copyWith(completedDates: newDates));
     }
   }
 
-  void toggleTaskCompletion(String id) {
-    final index = _tasks.indexWhere((t) => t.id == id);
+  Future<void> addHabit(String title, String description, Color color, IconData icon, String frequency) async {
+    if (_firestoreService == null) {
+      print("Error: FirestoreService is null in addHabit");
+      return;
+    }
+    
+    final habit = Habit(
+      id: '',
+      title: title,
+      description: description,
+      colorValue: color.value,
+      iconCodePoint: icon.codePoint,
+      frequency: frequency,
+      completedDates: [],
+      createdAt: DateTime.now(),
+    );
+    
+    try {
+      await _firestoreService!.createHabit(habit);
+      print("Habit added successfully: $title");
+    } catch (e) {
+      print("Error adding habit: $e");
+    }
+  }
+
+  Future<void> updateHabit(String id, String title, String description, Color color, IconData icon, String frequency) async {
+    if (_firestoreService == null) return;
+
+    final index = _habits.indexWhere((h) => h.id == id);
     if (index != -1) {
-      _tasks[index].isCompleted = !_tasks[index].isCompleted;
-      notifyListeners();
+      final habit = _habits[index].copyWith(
+        title: title,
+        description: description,
+        colorValue: color.value,
+        iconCodePoint: icon.codePoint,
+        frequency: frequency,
+      );
+      await _firestoreService!.updateHabit(habit);
     }
   }
 
-  void deleteTask(String id) {
-    _tasks.removeWhere((t) => t.id == id);
-    notifyListeners();
+  Future<void> deleteHabit(String id) async {
+    if (_firestoreService == null) return;
+    await _firestoreService!.deleteHabit(id);
   }
 
-  void addTask(String title, String notes, DateTime dueDate, bool isImportant, bool isUrgent) {
-    _tasks.add(Task(
-      id: const Uuid().v4(),
+  Future<void> addTask(String title, String notes, DateTime dueDate, bool isImportant, bool isUrgent) async {
+    if (_firestoreService == null) return;
+
+    final task = Task(
+      id: '',
       title: title,
       notes: notes,
       dueDate: dueDate,
       isImportant: isImportant,
       isUrgent: isUrgent,
-    ));
-    notifyListeners();
+      isCompleted: false,
+      createdAt: DateTime.now(),
+    );
+
+    await _firestoreService!.createTask(task);
   }
 
-  void updateTask(String id, String title, String notes, DateTime dueDate, bool isImportant, bool isUrgent) {
+  Future<void> updateTask(String id, String title, String notes, DateTime dueDate, bool isImportant, bool isUrgent) async {
+    if (_firestoreService == null) return;
+
     final index = _tasks.indexWhere((t) => t.id == id);
     if (index != -1) {
-      final oldTask = _tasks[index];
-      _tasks[index] = Task(
-        id: id,
+      final task = _tasks[index].copyWith(
         title: title,
         notes: notes,
         dueDate: dueDate,
         isImportant: isImportant,
         isUrgent: isUrgent,
-        isCompleted: oldTask.isCompleted,
       );
-      notifyListeners();
+      await _firestoreService!.updateTask(task);
     }
   }
 
-  void addHabit(String title, String description, Color color, IconData icon, String frequency) {
-    _habits.add(Habit(
-      id: const Uuid().v4(),
-      title: title,
-      description: description,
-      color: color,
-      icon: icon,
-      frequency: frequency,
-    ));
-    notifyListeners();
-  }
+  Future<void> toggleTaskCompletion(String id) async {
+    if (_firestoreService == null) return;
 
-  void updateHabit(String id, String title, String description, Color color, IconData icon, String frequency) {
-    final index = _habits.indexWhere((h) => h.id == id);
+    final index = _tasks.indexWhere((t) => t.id == id);
     if (index != -1) {
-      final oldHabit = _habits[index];
-      _habits[index] = Habit(
-        id: id,
-        title: title,
-        description: description,
-        color: color,
-        icon: icon,
-        frequency: frequency,
-        completedDates: oldHabit.completedDates,
-      );
-      notifyListeners();
+      final task = _tasks[index];
+      await _firestoreService!.updateTask(task.copyWith(isCompleted: !task.isCompleted));
     }
   }
 
-  void deleteHabit(String id) {
-    _habits.removeWhere((h) => h.id == id);
-    notifyListeners();
+  Future<void> deleteTask(String id) async {
+    if (_firestoreService == null) return;
+    await _firestoreService!.deleteTask(id);
   }
 }
+
