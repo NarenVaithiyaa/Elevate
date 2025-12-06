@@ -3,14 +3,35 @@ import 'package:flutter/material.dart';
 import 'package:habit_tracker_mvp/models/habit.dart';
 import 'package:habit_tracker_mvp/models/task.dart';
 import 'package:habit_tracker_mvp/services/firestore_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AppState extends ChangeNotifier {
   bool _isDarkMode = false;
   bool get isDarkMode => _isDarkMode;
+
+  bool _biometricEnabled = false;
+  bool get biometricEnabled => _biometricEnabled;
   
   FirestoreService? _firestoreService;
   StreamSubscription<List<Habit>>? _habitsSubscription;
   StreamSubscription<List<Task>>? _tasksSubscription;
+
+  AppState() {
+    _loadPreferences();
+  }
+
+  Future<void> _loadPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    _biometricEnabled = prefs.getBool('biometric_enabled') ?? false;
+    notifyListeners();
+  }
+
+  Future<void> setBiometricEnabled(bool enabled) async {
+    _biometricEnabled = enabled;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('biometric_enabled', enabled);
+    notifyListeners();
+  }
 
   void toggleTheme() {
     _isDarkMode = !_isDarkMode;

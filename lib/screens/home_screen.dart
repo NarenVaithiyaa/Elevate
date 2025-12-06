@@ -158,19 +158,20 @@ class _DashboardViewState extends State<DashboardView> {
             _weatherIcon = _getWeatherIcon(main);
           });
         }
-      } else {
-        if (mounted) {
-          setState(() {
-            _weatherCondition = "Weather unavailable";
-            _weatherSuggestion = "Could not fetch local weather.";
-          });
-        }
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _weatherCondition = "Weather unavailable";
-          _weatherSuggestion = "Please check location permissions.";
+          // Show a more user-friendly error message based on the exception
+          if (e.toString().contains('Location services are disabled')) {
+            _weatherSuggestion = "Please enable location services.";
+          } else if (e.toString().contains('denied')) {
+            _weatherSuggestion = "Location permission denied.";
+          } else {
+            _weatherSuggestion = "Check internet or API key.";
+          }
+          debugPrint('Weather Error: $e');
         });
       }
     }

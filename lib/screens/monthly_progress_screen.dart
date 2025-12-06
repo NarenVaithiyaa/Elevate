@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:habit_tracker_mvp/models/habit.dart';
 import 'package:habit_tracker_mvp/providers/app_state.dart';
 import 'package:habit_tracker_mvp/theme/app_theme.dart';
 import 'package:provider/provider.dart';
@@ -27,6 +28,158 @@ class _MonthlyProgressScreenState extends State<MonthlyProgressScreen> {
     return DateTime(date.year, date.month, 1).weekday;
   }
 
+  int _calculateMonthlyStreak(Habit habit, DateTime month) {
+    final datesInMonth = habit.completedDates.where((date) => 
+      date.year == month.year && date.month == month.month
+    ).toList()..sort();
+
+    if (datesInMonth.isEmpty) return 0;
+
+    int maxStreak = 0;
+    int currentStreak = 0;
+    
+    for (int i = 0; i < datesInMonth.length; i++) {
+      if (i == 0) {
+        currentStreak = 1;
+      } else {
+        final prev = datesInMonth[i - 1];
+        final curr = datesInMonth[i];
+        if (curr.day == prev.day + 1) {
+          currentStreak++;
+        } else if (curr.day == prev.day) {
+          // Same day, ignore
+        } else {
+          currentStreak = 1;
+        }
+      }
+      if (currentStreak > maxStreak) maxStreak = currentStreak;
+    }
+    return maxStreak;
+  }
+
+  void _showDayDetails(BuildContext context, int day, List<Habit> habits) {
+    final date = DateTime(_focusedDate.year, _focusedDate.month, day);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.5,
+          minChildSize: 0.3,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (context, scrollController) {
+            return Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    '${_monthName(date.month)} $day, ${date.year}',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: habits.isEmpty 
+                      ? const Center(child: Text('No habits to show.'))
+                      : ListView.builder(
+                          controller: scrollController,
+                          itemCount: habits.length,
+                          itemBuilder: (context, index) {
+                            final habit = habits[index];
+                            final isCompleted = habit.completedDates.any((d) => 
+                              d.year == date.year && d.month == date.month && d.day == date.day
+                            );
+                            
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).cardTheme.color ?? (isDark ? const Color(0xFF1E1E1E) : Colors.white),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: isCompleted ? habit.color.withOpacity(0.5) : Colors.transparent,
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: habit.color.withOpacity(0.1),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(habit.icon, color: habit.color, size: 20),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Text(
+                                      habit.title,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ),
+                                  if (isCompleted)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.accentPrimary.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: const Text(
+                                        'Done',
+                                        style: TextStyle(
+                                          color: AppColors.accentPrimary,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    )
+                                  else
+                                    Text(
+                                      'Missed',
+                                      style: TextStyle(
+                                        color: isDark ? Colors.grey[600] : Colors.grey[400],
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final appState = Provider.of<AppState>(context);
@@ -45,8 +198,6 @@ class _MonthlyProgressScreenState extends State<MonthlyProgressScreen> {
 
     final daysInMonth = _getDaysInMonth(_focusedDate);
     final firstWeekday = _getFirstWeekday(_focusedDate); // 1 = Mon, 7 = Sun
-    // Adjust for 0-based index if needed, but GridView usually works well with 1-based logic if we pad.
-    // Let's assume Monday start.
     final paddingDays = firstWeekday - 1; 
 
     return Scaffold(
@@ -58,7 +209,7 @@ class _MonthlyProgressScreenState extends State<MonthlyProgressScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Stats Cards (Placeholder for now, or we can calculate)
+            // Stats Cards
             Row(
               children: [
                 Expanded(
@@ -172,20 +323,24 @@ class _MonthlyProgressScreenState extends State<MonthlyProgressScreen> {
                         cellColor = AppColors.accentPrimary.withOpacity(0.2 + (0.8 * intensity));
                       }
 
-                      return Container(
-                        decoration: BoxDecoration(
-                          color: cellColor,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          '$day',
-                          style: TextStyle(
-                            color: count > 0 
-                                ? (intensity > 0.5 ? Colors.white : AppColors.accentPrimary)
-                                : (isDark ? Colors.grey[600] : Colors.grey[400]),
-                            fontWeight: count > 0 ? FontWeight.bold : FontWeight.normal,
-                            fontSize: 12,
+                      return InkWell(
+                        onTap: () => _showDayDetails(context, day, habits),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: cellColor,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            '$day',
+                            style: TextStyle(
+                              color: count > 0 
+                                  ? (intensity > 0.5 ? Colors.white : AppColors.accentPrimary)
+                                  : (isDark ? Colors.grey[600] : Colors.grey[400]),
+                              fontWeight: count > 0 ? FontWeight.bold : FontWeight.normal,
+                              fontSize: 12,
+                            ),
                           ),
                         ),
                       );
@@ -193,6 +348,100 @@ class _MonthlyProgressScreenState extends State<MonthlyProgressScreen> {
                   ),
                 ],
               ),
+            ),
+            
+            const SizedBox(height: 32),
+            
+            // Monthly Streak per Activity
+            Text(
+              'Monthly Performance',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: habits.length,
+              itemBuilder: (context, index) {
+                final habit = habits[index];
+                final streak = _calculateMonthlyStreak(habit, _focusedDate);
+                final totalDays = habit.completedDates.where((d) => 
+                  d.year == _focusedDate.year && d.month == _focusedDate.month
+                ).length;
+                
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardTheme.color ?? (isDark ? const Color(0xFF1E1E1E) : Colors.white),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 5,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: habit.color.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(habit.icon, color: habit.color),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              habit.title,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '$totalDays days completed',
+                              style: TextStyle(
+                                color: isDark ? Colors.grey[400] : Colors.grey[600],
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '$streak',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 20,
+                              color: habit.color,
+                            ),
+                          ),
+                          Text(
+                            'streak',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: isDark ? Colors.grey[500] : Colors.grey[500],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
           ],
         ),

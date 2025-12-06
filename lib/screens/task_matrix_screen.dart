@@ -4,7 +4,6 @@ import 'package:habit_tracker_mvp/providers/app_state.dart';
 import 'package:habit_tracker_mvp/theme/app_theme.dart';
 import 'package:habit_tracker_mvp/screens/add_task_sheet.dart';
 import 'package:habit_tracker_mvp/screens/manage_tasks_screen.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:habit_tracker_mvp/providers/calendar_provider.dart';
 import 'package:habit_tracker_mvp/widgets/calendar_event_tile.dart';
 import 'package:provider/provider.dart';

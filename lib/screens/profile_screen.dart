@@ -3,6 +3,7 @@ import 'package:habit_tracker_mvp/providers/auth_provider.dart';
 import 'package:habit_tracker_mvp/providers/app_state.dart';
 import 'package:habit_tracker_mvp/theme/app_theme.dart';
 import 'package:provider/provider.dart';
+import 'package:local_auth/local_auth.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -14,6 +15,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   bool _syncEnabled = true;
   bool _notificationsEnabled = true;
+  final LocalAuthentication auth = LocalAuthentication();
 
   void _handleLogout() {
     showDialog(
@@ -40,8 +42,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final user = Provider.of<AuthProvider>(context).user;
+  Widget build(BuildContext ctx) {
+    final user = Provider.of<AuthProvider>(ctx).user;
 
     return Scaffold(
       body: SafeArea(
@@ -71,15 +73,64 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               Text(
                 user?.email ?? 'email@example.com',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
                   color: AppColors.textSecondary,
                 ),
               ),
               const SizedBox(height: 32),
               
-              _buildSectionTitle(context, 'General'),
+              _buildSectionTitle(ctx, 'General'),
               _buildListTile(
-                context,
+                ctx,
+                icon: Icons.fingerprint,
+                title: 'Unlock with Fingerprint',
+                trailing: Switch(
+                  value: Provider.of<AppState>(ctx).biometricEnabled,
+                  activeColor: AppColors.accentPrimary,
+                  onChanged: (val) async {
+                    if (val) {
+                      final bool canAuthenticateWithBiometrics = await auth.canCheckBiometrics;
+                      final bool canAuthenticate = canAuthenticateWithBiometrics || await auth.isDeviceSupported();
+                      
+                      if (!canAuthenticate) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Biometrics not supported on this device')),
+                          );
+                        }
+                        return;
+                      }
+
+                      try {
+                        final bool didAuthenticate = await auth.authenticate(
+                          localizedReason: 'Please authenticate to enable fingerprint unlock',
+                          biometricOnly: true,
+                        );
+                        if (!didAuthenticate) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Authentication failed')),
+                            );
+                          }
+                          return;
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error: $e')),
+                          );
+                        }
+                        return;
+                      }
+                    }
+                    if (mounted) {
+                      Provider.of<AppState>(context, listen: false).setBiometricEnabled(val);
+                    }
+                  },
+                ),
+              ),
+              _buildListTile(
+                ctx,
                 icon: Icons.sync,
                 title: 'Sync Calendars',
                 trailing: Switch(
@@ -87,14 +138,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   activeColor: AppColors.accentPrimary,
                   onChanged: (val) {
                     setState(() => _syncEnabled = val);
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    ScaffoldMessenger.of(ctx).showSnackBar(
                       SnackBar(content: Text(val ? 'Calendar sync enabled' : 'Calendar sync disabled')),
                     );
                   },
                 ),
               ),
               _buildListTile(
-                context,
+                ctx,
                 icon: Icons.notifications_outlined,
                 title: 'Notifications',
                 trailing: Switch(
@@ -106,14 +157,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               _buildListTile(
-                context,
+                ctx,
                 icon: Icons.dark_mode_outlined,
                 title: 'Dark Mode',
                 trailing: Switch(
-                  value: Provider.of<AppState>(context).isDarkMode,
+                  value: Provider.of<AppState>(ctx).isDarkMode,
                   activeColor: AppColors.accentPrimary,
                   onChanged: (val) {
-                    Provider.of<AppState>(context, listen: false).toggleTheme();
+                    Provider.of<AppState>(ctx, listen: false).toggleTheme();
                   },
                 ),
               ),

@@ -23,19 +23,29 @@ class LoginScreen extends StatelessWidget {
                 height: 120,
                 width: 120,
                 decoration: BoxDecoration(
-                  color: AppColors.accentPrimary.withOpacity(0.1),
+                  color: AppColors.accentPrimary.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
-                  Icons.check_circle_outline,
-                  size: 60,
-                  color: AppColors.accentPrimary,
+                child: Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Image.asset(
+                    'assets/icon/icon.png',
+                    fit: BoxFit.contain,
+                  ),
                 ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
+              Text(
+                'Elevate',
+                style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.accentPrimary,
+                    ),
+              ),
+              const SizedBox(height: 8),
               Text(
                 'Welcome Back',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
               ),
