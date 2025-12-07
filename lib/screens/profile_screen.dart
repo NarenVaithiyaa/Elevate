@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:habit_tracker_mvp/providers/auth_provider.dart';
 import 'package:habit_tracker_mvp/providers/app_state.dart';
+import 'package:habit_tracker_mvp/providers/calendar_provider.dart';
+import 'package:habit_tracker_mvp/services/notification_service.dart';
 import 'package:habit_tracker_mvp/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:local_auth/local_auth.dart';
@@ -13,9 +15,68 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  bool _syncEnabled = true;
-  bool _notificationsEnabled = true;
+  // bool _notificationsEnabled = false; // Moved to AppState
   final LocalAuthentication auth = LocalAuthentication();
+
+  @override
+  void initState() {
+    super.initState();
+    NotificationService().init();
+  }
+
+  Future<void> _scheduleNotifications() async {
+    final appState = Provider.of<AppState>(context, listen: false);
+    if (!appState.notificationsEnabled) return;
+
+    final notificationService = NotificationService();
+    await notificationService.cancelAllNotifications();
+
+    // 1. Schedule Calendar Events
+    final calendarProvider = Provider.of<CalendarProvider>(context, listen: false);
+    if (calendarProvider.isConnected) {
+      for (var event in calendarProvider.events) {
+        if (event.start?.dateTime != null) {
+          final startTime = event.start!.dateTime!;
+          if (startTime.isAfter(DateTime.now())) {
+             // Schedule at start time
+             await notificationService.scheduleNotification(
+               id: event.hashCode,
+               title: 'Event Starting: ${event.summary ?? "No Title"}',
+               body: 'Your event is starting now.',
+               scheduledDate: startTime,
+             );
+             
+             // Schedule 15 mins before
+             final reminderTime = startTime.subtract(const Duration(minutes: 15));
+             if (reminderTime.isAfter(DateTime.now())) {
+               await notificationService.scheduleNotification(
+                 id: event.hashCode + 1,
+                 title: 'Upcoming Event: ${event.summary ?? "No Title"}',
+                 body: 'Starts in 15 minutes.',
+                 scheduledDate: reminderTime,
+               );
+             }
+          }
+        }
+      }
+    }
+
+    // 2. Schedule Important & Urgent Tasks
+    // final appState = Provider.of<AppState>(context, listen: false); // Already declared above
+    final importantUrgentTasks = appState.tasks.where((t) => t.isImportant && t.isUrgent && !t.isCompleted).toList();
+    
+    for (var task in importantUrgentTasks) {
+       final dueDate = task.dueDate;
+       if (dueDate.isAfter(DateTime.now())) {
+          await notificationService.scheduleNotification(
+            id: task.hashCode,
+            title: 'Urgent Task Due: ${task.title}',
+            body: 'This task is marked as Important & Urgent.',
+            scheduledDate: dueDate,
+          );
+       }
+    }
+  }
 
   void _handleLogout() {
     showDialog(
@@ -86,7 +147,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 title: 'Unlock with Fingerprint',
                 trailing: Switch(
                   value: Provider.of<AppState>(ctx).biometricEnabled,
-                  activeColor: AppColors.accentPrimary,
+                  activeThumbColor: AppColors.accentPrimary,
                   onChanged: (val) async {
                     if (val) {
                       final bool canAuthenticateWithBiometrics = await auth.canCheckBiometrics;
@@ -133,13 +194,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ctx,
                 icon: Icons.sync,
                 title: 'Sync Calendars',
-                trailing: Switch(
-                  value: _syncEnabled,
-                  activeColor: AppColors.accentPrimary,
-                  onChanged: (val) {
-                    setState(() => _syncEnabled = val);
-                    ScaffoldMessenger.of(ctx).showSnackBar(
-                      SnackBar(content: Text(val ? 'Calendar sync enabled' : 'Calendar sync disabled')),
+                trailing: Consumer<CalendarProvider>(
+                  builder: (context, calendarProvider, child) {
+                    return Switch(
+                      value: calendarProvider.isConnected,
+                      activeThumbColor: AppColors.accentPrimary,
+                      onChanged: (val) async {
+                        if (val) {
+                          await calendarProvider.connectAndFetch();
+                          final appState = Provider.of<AppState>(context, listen: false);
+                          if (calendarProvider.isConnected && appState.notificationsEnabled) {
+                            _scheduleNotifications();
+                          }
+                          if (mounted) {
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                              SnackBar(content: Text(calendarProvider.isConnected ? 'Calendar sync enabled' : 'Failed to sync calendar')),
+                            );
+                          }
+                        } else {
+                          calendarProvider.disconnect();
+                          if (mounted) {
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                              const SnackBar(content: Text('Calendar sync disabled')),
+                            );
+                          }
+                        }
+                      },
                     );
                   },
                 ),
@@ -148,11 +228,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ctx,
                 icon: Icons.notifications_outlined,
                 title: 'Notifications',
-                trailing: Switch(
-                  value: _notificationsEnabled,
-                  activeColor: AppColors.accentPrimary,
-                  onChanged: (val) {
-                    setState(() => _notificationsEnabled = val);
+                trailing: Consumer<AppState>(
+                  builder: (context, appState, child) {
+                    return Switch(
+                      value: appState.notificationsEnabled,
+                      activeThumbColor: AppColors.accentPrimary,
+                      onChanged: (val) async {
+                        if (val) {
+                          final granted = await NotificationService().requestPermissions();
+                          if (granted) {
+                            await appState.setNotificationsEnabled(true);
+                            await _scheduleNotifications();
+                            if (mounted) {
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                const SnackBar(content: Text('Notifications enabled')),
+                              );
+                            }
+                          } else {
+                            await appState.setNotificationsEnabled(false);
+                            if (mounted) {
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                const SnackBar(content: Text('Permission denied')),
+                              );
+                            }
+                          }
+                        } else {
+                          await appState.setNotificationsEnabled(false);
+                          await NotificationService().cancelAllNotifications();
+                          if (mounted) {
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                              const SnackBar(content: Text('Notifications disabled')),
+                            );
+                          }
+                        }
+                      },
+                    );
                   },
                 ),
               ),
@@ -162,7 +272,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 title: 'Dark Mode',
                 trailing: Switch(
                   value: Provider.of<AppState>(ctx).isDarkMode,
-                  activeColor: AppColors.accentPrimary,
+                  activeThumbColor: AppColors.accentPrimary,
                   onChanged: (val) {
                     Provider.of<AppState>(ctx, listen: false).toggleTheme();
                   },

@@ -44,7 +44,8 @@ class LoginScreen extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Welcome Back',
+                'Welcome buddy, thanks for choosing elevate',
+                textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -58,31 +59,37 @@ class LoginScreen extends StatelessWidget {
                     ),
               ),
               const Spacer(),
-              if (authProvider.isLoading)
-                const CircularProgressIndicator()
-              else
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton.icon(
-                    onPressed: () => authProvider.googleLogin(),
-                    icon: const FaIcon(FontAwesomeIcons.google, color: Colors.white),
-                    label: const Text(
-                      'Continue with Google',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton.icon(
+                  onPressed: authProvider.isLoading ? null : () => authProvider.googleLogin(),
+                  icon: authProvider.isLoading 
+                    ? const SizedBox(
+                        width: 24, 
+                        height: 24, 
+                        child: CircularProgressIndicator(
+                          color: Colors.white, 
+                          strokeWidth: 2,
+                        )
+                      )
+                    : const FaIcon(FontAwesomeIcons.google, color: Colors.white),
+                  label: Text(
+                    authProvider.isLoading ? 'Signing in...' : 'Continue with Google',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.accentPrimary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accentPrimary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
                     ),
                   ),
                 ),
+              ),
               const SizedBox(height: 24),
             ],
           ),

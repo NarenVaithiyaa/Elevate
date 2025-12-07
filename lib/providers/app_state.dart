@@ -11,6 +11,9 @@ class AppState extends ChangeNotifier {
 
   bool _biometricEnabled = false;
   bool get biometricEnabled => _biometricEnabled;
+
+  bool _notificationsEnabled = false;
+  bool get notificationsEnabled => _notificationsEnabled;
   
   FirestoreService? _firestoreService;
   StreamSubscription<List<Habit>>? _habitsSubscription;
@@ -23,6 +26,8 @@ class AppState extends ChangeNotifier {
   Future<void> _loadPreferences() async {
     final prefs = await SharedPreferences.getInstance();
     _biometricEnabled = prefs.getBool('biometric_enabled') ?? false;
+    _isDarkMode = prefs.getBool('is_dark_mode') ?? false;
+    _notificationsEnabled = prefs.getBool('notifications_enabled') ?? false;
     notifyListeners();
   }
 
@@ -33,8 +38,17 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void toggleTheme() {
+  Future<void> setNotificationsEnabled(bool enabled) async {
+    _notificationsEnabled = enabled;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('notifications_enabled', enabled);
+    notifyListeners();
+  }
+
+  Future<void> toggleTheme() async {
     _isDarkMode = !_isDarkMode;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('is_dark_mode', _isDarkMode);
     notifyListeners();
   }
 
@@ -92,6 +106,7 @@ class AppState extends ChangeNotifier {
       }
 
       await _firestoreService!.updateHabit(habit.copyWith(completedDates: newDates));
+      print("Habit completion toggled: ${habit.title}, Completed: ${todayIndex == -1}");
     }
   }
 
@@ -132,13 +147,23 @@ class AppState extends ChangeNotifier {
         iconCodePoint: icon.codePoint,
         frequency: frequency,
       );
-      await _firestoreService!.updateHabit(habit);
+      try {
+        await _firestoreService!.updateHabit(habit);
+        print("Habit updated successfully: $title");
+      } catch (e) {
+        print("Error updating habit: $e");
+      }
     }
   }
 
   Future<void> deleteHabit(String id) async {
     if (_firestoreService == null) return;
-    await _firestoreService!.deleteHabit(id);
+    try {
+      await _firestoreService!.deleteHabit(id);
+      print("Habit deleted successfully: $id");
+    } catch (e) {
+      print("Error deleting habit: $e");
+    }
   }
 
   Future<void> addTask(String title, String notes, DateTime dueDate, bool isImportant, bool isUrgent) async {

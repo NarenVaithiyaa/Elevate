@@ -85,4 +85,11 @@ class CalendarProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  void disconnect() {
+    _events = [];
+    _isConnected = false;
+    _error = null;
+    notifyListeners();
+  }
 }

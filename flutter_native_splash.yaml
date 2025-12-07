@@ -1,10 +1,12 @@
 flutter_native_splash:
   color: "#FFFFFF"
-  image: assets/icon/icon.png
+  image: assets/icon/splash_logo.png
   color_dark: "#121212"
-  image_dark: assets/icon/icon.png
+  image_dark: assets/icon/splash_logo.png
 
   android_12:
-    image: assets/icon/icon.png
-    color: "#FFFFFF"
-    color_dark: "#121212"
+    image: assets/icon/splash_logo.png
+    icon_background_color: "#FFFFFF"
+    icon_background_color_dark: "#121212"
+    # branding removed to prevent double logo
+
