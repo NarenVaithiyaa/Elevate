@@ -224,7 +224,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                 child: SwitchListTile(
                   title: const Text('Important', style: TextStyle(fontWeight: FontWeight.w600)),
                   value: _isImportant,
-                  activeColor: AppColors.accentPrimary,
+                  activeThumbColor: AppColors.accentPrimary,
                   contentPadding: EdgeInsets.zero,
                   onChanged: (val) => setState(() => _isImportant = val),
                 ),
@@ -233,7 +233,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                 child: SwitchListTile(
                   title: const Text('Urgent', style: TextStyle(fontWeight: FontWeight.w600)),
                   value: _isUrgent,
-                  activeColor: Colors.orange,
+                  activeThumbColor: Colors.orange,
                   contentPadding: EdgeInsets.zero,
                   onChanged: (val) => setState(() => _isUrgent = val),
                 ),

@@ -158,7 +158,7 @@ class _AddHabitSheetState extends State<AddHabitSheet> {
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
-            value: _frequency,
+            initialValue: _frequency,
             dropdownColor: Theme.of(context).cardColor,
             style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color),
             decoration: InputDecoration(

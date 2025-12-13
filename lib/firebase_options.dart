@@ -3,6 +3,7 @@
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 /// Default [FirebaseOptions] for use with your Firebase apps.
 ///
@@ -47,10 +48,10 @@ class DefaultFirebaseOptions {
     }
   }
 
-  static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyATILkwroF7NrPhQ7qgQgpD-t16b862i_4',
-    appId: '1:685728481364:android:39b129c026dd7f958eedc1',
-    messagingSenderId: '685728481364',
-    projectId: 'habit-tracker-mvp-7cc72',
-  );
+  static FirebaseOptions get android => FirebaseOptions(
+        apiKey: dotenv.env['FIREBASE_ANDROID_API_KEY']!,
+        appId: dotenv.env['FIREBASE_ANDROID_APP_ID']!,
+        messagingSenderId: dotenv.env['FIREBASE_ANDROID_MESSAGING_SENDER_ID']!,
+        projectId: dotenv.env['FIREBASE_ANDROID_PROJECT_ID']!,
+      );
 }
